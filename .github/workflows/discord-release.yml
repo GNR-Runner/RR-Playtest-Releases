@@ -1,0 +1,41 @@
+name: Discord Release Notifications
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  notify-discord:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            message="🧪 Renaissance Reimagined webhook test successful!"
+            mentions='[]'
+          else
+            title="${RELEASE_NAME:-$RELEASE_TAG}"
+            message=$(printf '@everyone\n🚀 **Renaissance Reimagined — %s is out!**\n\nDownload: %s' "$title" "$RELEASE_URL")
+            mentions='["everyone"]'
+          fi
+
+          payload=$(jq -n \
+            --arg content "$message" \
+            --argjson mentions "$mentions" \
+            '{content: $content, allowed_mentions: {parse: $mentions}}')
+
+          curl --fail-with-body --silent --show-error \
+            -H "Content-Type: application/json" \
+            --data "$payload" \
+            "$DISCORD_WEBHOOK_URL"
